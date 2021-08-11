@@ -43,36 +43,11 @@ var CACHED_CWiseOp = {
   }
 }
 
-//Generates a cwise operator
 function generateCWiseOp(proc) {
   return CACHED_CWiseOp[proc.funcName]
 }
 
-// The function below is called when constructing a cwise function object, and does the following:
-// A function object is constructed which accepts as argument a compilation function and returns another function.
-// It is this other function that is eventually returned by createThunk, and this function is the one that actually
-// checks whether a certain pattern of arguments has already been used before and compiles new loops as needed.
-// The compilation passed to the first function object is used for compiling new functions.
-// Once this function object is created, it is called with compile as argument, where the first argument of compile
-// is bound to "proc" (essentially containing a preprocessed version of the user arguments to cwise).
-// So createThunk roughly works like this:
-// function createThunk(proc) {
-//   var thunk = function(compileBound) {
-//     var CACHED = {}
-//     return function(arrays and scalars) {
-//       if (dtype and order of arrays in CACHED) {
-//         var func = CACHED[dtype and order of arrays]
-//       } else {
-//         var func = CACHED[dtype and order of arrays] = compileBound(dtype and order of arrays)
-//       }
-//       return func(arrays and scalars)
-//     }
-//   }
-//   return thunk(compile.bind1(proc))
-// }
-
 var compile = generateCWiseOp
-
 
 var CACHED_thunk = {
   cdiff: function(compile) {
@@ -139,7 +114,6 @@ function Procedure() {
   this.pre = null
   this.body = null
   this.post = null
-  this.debug = false
 }
 
 function compileCwise(user_args) {
@@ -161,70 +135,22 @@ function compileCwise(user_args) {
       proc.arrayArgs.push(i)
       proc.arrayBlockIndices.push(arg_type.blockIndices ? arg_type.blockIndices : 0)
       proc.shimArgs.push("array" + i)
-      if(i < proc.pre.args.length && proc.pre.args[i].count>0) {
-        throw new Error("cwise: pre() block may not reference array args")
-      }
-      if(i < proc.post.args.length && proc.post.args[i].count>0) {
-        throw new Error("cwise: post() block may not reference array args")
-      }
     } else if(arg_type === "scalar") {
       proc.scalarArgs.push(i)
       proc.shimArgs.push("scalar" + i)
     } else if(arg_type === "index") {
       proc.indexArgs.push(i)
-      if(i < proc.pre.args.length && proc.pre.args[i].count > 0) {
-        throw new Error("cwise: pre() block may not reference array index")
-      }
-      if(i < proc.body.args.length && proc.body.args[i].lvalue) {
-        throw new Error("cwise: body() block may not write to array index")
-      }
-      if(i < proc.post.args.length && proc.post.args[i].count > 0) {
-        throw new Error("cwise: post() block may not reference array index")
-      }
     } else if(arg_type === "shape") {
       proc.shapeArgs.push(i)
-      if(i < proc.pre.args.length && proc.pre.args[i].lvalue) {
-        throw new Error("cwise: pre() block may not write to array shape")
-      }
-      if(i < proc.body.args.length && proc.body.args[i].lvalue) {
-        throw new Error("cwise: body() block may not write to array shape")
-      }
-      if(i < proc.post.args.length && proc.post.args[i].lvalue) {
-        throw new Error("cwise: post() block may not write to array shape")
-      }
     } else if(typeof arg_type === "object" && arg_type.offset) {
       proc.argTypes[i] = "offset"
       proc.offsetArgs.push({ array: arg_type.array, offset:arg_type.offset })
       proc.offsetArgIndex.push(i)
-    } else {
-      throw new Error("cwise: Unknown argument type " + proc_args[i])
     }
   }
 
-  //Make sure at least one array argument was specified
-  if(proc.arrayArgs.length <= 0) {
-    throw new Error("cwise: No array arguments specified")
-  }
-
-  //Make sure arguments are correct
-  if(proc.pre.args.length > proc_args.length) {
-    throw new Error("cwise: Too many arguments in pre() block")
-  }
-  if(proc.body.args.length > proc_args.length) {
-    throw new Error("cwise: Too many arguments in body() block")
-  }
-  if(proc.post.args.length > proc_args.length) {
-    throw new Error("cwise: Too many arguments in post() block")
-  }
-
-  //Check debug flag
-  proc.debug = !!user_args.printCode || !!user_args.debug
-
   //Retrieve name
   proc.funcName = user_args.funcName || "cwise"
-
-  //Read in block size
-  proc.blockSize = user_args.blockSize || 64
 
   return createThunk(proc)
 }
@@ -465,24 +391,11 @@ function generateGradient(boundaryConditions) {
 }
 
 function gradient(out, inp, bc) {
-  if(Array.isArray(bc)) {
-    if(bc.length !== inp.dimension) {
-      throw new Error('ndarray-gradient: invalid boundary conditions')
-    }
-  } else if(typeof bc === 'string') {
-    bc = dup(inp.dimension, bc)
-  } else {
-    bc = dup(inp.dimension, 'clamp')
-  }
-  if(out.dimension !== inp.dimension + 1) {
-    throw new Error('ndarray-gradient: output dimension must be +1 input dimension')
-  }
-  if(out.shape[inp.dimension] !== inp.dimension) {
-    throw new Error('ndarray-gradient: output shape must match input shape')
-  }
-  for(var i=0; i<inp.dimension; ++i) {
-    if(out.shape[i] !== inp.shape[i]) {
-      throw new Error('ndarray-gradient: shape mismatch')
+  if(!Array.isArray(bc)) {
+    if(typeof bc === 'string') {
+      bc = dup(inp.dimension, bc)
+    } else {
+      bc = dup(inp.dimension, 'clamp')
     }
   }
   if(inp.size === 0) {
