@@ -49,10 +49,6 @@ var CACHED_thunk = {
   cdiff: function(compile) {
     var CACHED = {}
     return function cdiff_cwise_thunk(array0, array1, array2) {
-      if (!(array0.shape.length === array1.shape.length + 0 && array0.shape.length === array2.shape.length + 0)) throw new Error('cwise: Arrays do not all have the same dimensionality!')
-      for (var shapeIndex = array0.shape.length - 0; shapeIndex-- > 0;) {
-        if (!(array0.shape[shapeIndex + 0] === array1.shape[shapeIndex + 0] && array0.shape[shapeIndex + 0] === array2.shape[shapeIndex + 0])) throw new Error('cwise: Arrays do not all have the same shape!')
-      }
       var t0 = array0.dtype, r0 = array0.order, t1 = array1.dtype, r1 = array1.order, t2 = array2.dtype, r2 = array2.order, type = [t0, r0.join(), t1, r1.join(), t2, r2.join()].join(), proc = CACHED[type]
       if (!proc) { CACHED[type] = proc = compile([t0, r0, t1, r1, t2, r2]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0, array1.data, array1.stride, array1.offset | 0, array2.data, array2.stride, array2.offset | 0)
     }
@@ -69,10 +65,6 @@ var CACHED_thunk = {
   fdTemplate1: function(compile) {
     var CACHED = {}
     return function fdTemplate1_cwise_thunk(array0, array1) {
-      if (!(array0.shape.length === array1.shape.length + 0)) throw new Error('cwise: Arrays do not all have the same dimensionality!')
-      for (var shapeIndex = array0.shape.length - 0; shapeIndex-- > 0;) {
-        if (!(array0.shape[shapeIndex + 0] === array1.shape[shapeIndex + 0])) throw new Error('cwise: Arrays do not all have the same shape!')
-      }
       var t0 = array0.dtype, r0 = array0.order, t1 = array1.dtype, r1 = array1.order, type = [t0, r0.join(), t1, r1.join()].join(), proc = CACHED[type]
       if (!proc) { CACHED[type] = proc = compile([t0, r0, t1, r1]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0, array1.data, array1.stride, array1.offset | 0)
     }
@@ -81,10 +73,6 @@ var CACHED_thunk = {
   fdTemplate2: function(compile) {
     var CACHED = {}
     return function fdTemplate2_cwise_thunk(array0, array1, array4) {
-      if (!(array0.shape.length === array1.shape.length + 0 && array0.shape.length === array4.shape.length + 0)) throw new Error('cwise: Arrays do not all have the same dimensionality!')
-      for (var shapeIndex = array0.shape.length - 0; shapeIndex-- > 0;) {
-        if (!(array0.shape[shapeIndex + 0] === array1.shape[shapeIndex + 0] && array0.shape[shapeIndex + 0] === array4.shape[shapeIndex + 0])) throw new Error('cwise: Arrays do not all have the same shape!')
-      }
       var t0 = array0.dtype, r0 = array0.order, t1 = array1.dtype, r1 = array1.order, t4 = array4.dtype, r4 = array4.order, type = [t0, r0.join(), t1, r1.join(), t4, r4.join()].join(), proc = CACHED[type]
       if (!proc) { CACHED[type] = proc = compile([t0, r0, t1, r1, t4, r4]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0, array1.data, array1.stride, array1.offset | 0, array4.data, array4.stride, array4.offset | 0)
     }
