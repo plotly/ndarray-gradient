@@ -338,6 +338,110 @@ function generateTemplate(d) {
   })
 }
 
+function CACHED_link(diff, zero, grad1, grad2) {
+  return function(dst, src) {
+    var s = src.shape.slice()
+    if (1 && s[0] > 2 && s[1] > 2) {
+      grad2(
+        src
+          .pick(-1, -1)
+          .lo(1, 1)
+          .hi(s[0] - 2, s[1] - 2),
+        dst
+          .pick(-1, -1, 0)
+          .lo(1, 1)
+          .hi(s[0] - 2, s[1] - 2),
+        dst
+          .pick(-1, -1, 1)
+          .lo(1, 1)
+          .hi(s[0] - 2, s[1] - 2)
+      )
+    }
+    if (1 && s[1] > 2) {
+      grad1(
+        src
+          .pick(0, -1)
+          .lo(1)
+          .hi(s[1] - 2),
+        dst
+          .pick(0, -1, 1)
+          .lo(1)
+          .hi(s[1] - 2)
+      )
+      zero(
+        dst
+          .pick(0, -1, 0)
+          .lo(1)
+          .hi(s[1] - 2)
+      )
+    }
+    if (1 && s[1] > 2) {
+      grad1(
+        src
+          .pick(s[0] - 1, -1)
+          .lo(1)
+          .hi(s[1] - 2),
+        dst
+          .pick(s[0] - 1, -1, 1)
+          .lo(1)
+          .hi(s[1] - 2)
+      )
+      zero(
+        dst
+          .pick(s[0] - 1, -1, 0)
+          .lo(1)
+          .hi(s[1] - 2)
+      )
+    }
+    if (1 && s[0] > 2) {
+      grad1(
+        src
+          .pick(-1, 0)
+          .lo(1)
+          .hi(s[0] - 2),
+        dst
+          .pick(-1, 0, 0)
+          .lo(1)
+          .hi(s[0] - 2)
+      )
+      zero(
+        dst
+          .pick(-1, 0, 1)
+          .lo(1)
+          .hi(s[0] - 2)
+      )
+    }
+    if (1 && s[0] > 2) {
+      grad1(
+        src
+          .pick(-1, s[1] - 1)
+          .lo(1)
+          .hi(s[0] - 2),
+        dst
+          .pick(-1, s[1] - 1, 0)
+          .lo(1)
+          .hi(s[0] - 2)
+      )
+      zero(
+        dst
+          .pick(-1, s[1] - 1, 1)
+          .lo(1)
+          .hi(s[0] - 2)
+      )
+    }
+    dst.set(0, 0, 0, 0)
+    dst.set(0, 0, 1, 0)
+    dst.set(s[0] - 1, 0, 0, 0)
+    dst.set(s[0] - 1, 0, 1, 0)
+    dst.set(0, s[1] - 1, 0, 0)
+    dst.set(0, s[1] - 1, 1, 0)
+    dst.set(s[0] - 1, s[1] - 1, 0, 0)
+    dst.set(s[0] - 1, s[1] - 1, 1, 0)
+    return dst
+  }
+}
+
+
 function generateGradient(boundaryConditions) {
   var token = boundaryConditions.join()
   var proc = GRADIENT_CACHE[token]
@@ -346,150 +450,16 @@ function generateGradient(boundaryConditions) {
   }
 
   var d = boundaryConditions.length
-  var code = ['function gradient(dst,src){var s=src.shape.slice();' ]
 
-  function handleBoundary(facet) {
-    var cod = d - facet.length
-
-    var loStr = []
-    var hiStr = []
-    var pickStr = []
-    for(var i=0; i<d; ++i) {
-      if(facet.indexOf(i+1) >= 0) {
-        pickStr.push('0')
-      } else if(facet.indexOf(-(i+1)) >= 0) {
-        pickStr.push('s['+i+']-1')
-      } else {
-        pickStr.push('-1')
-        loStr.push('1')
-        hiStr.push('s['+i+']-2')
-      }
-    }
-    var boundStr = '.lo(' + loStr.join() + ').hi(' + hiStr.join() + ')'
-    if(loStr.length === 0) {
-      boundStr = ''
-    }
-
-    if(cod > 0) {
-      code.push('if(1')
-      for(var i=0; i<d; ++i) {
-        if(facet.indexOf(i+1) >= 0 || facet.indexOf(-(i+1)) >= 0) {
-          continue
-        }
-        code.push('&&s[', i, ']>2')
-      }
-      code.push('){grad', cod, '(src.pick(', pickStr.join(), ')', boundStr)
-      for(var i=0; i<d; ++i) {
-        if(facet.indexOf(i+1) >= 0 || facet.indexOf(-(i+1)) >= 0) {
-          continue
-        }
-        code.push(',dst.pick(', pickStr.join(), ',', i, ')', boundStr)
-      }
-      code.push(');')
-    }
-
-    for(var i=0; i<facet.length; ++i) {
-      var bnd = Math.abs(facet[i])-1
-      var outStr = 'dst.pick(' + pickStr.join() + ',' + bnd + ')' + boundStr
-      switch(boundaryConditions[bnd]) {
-
-        case 'clamp':
-          var cPickStr = pickStr.slice()
-          var dPickStr = pickStr.slice()
-          if(facet[i] < 0) {
-            cPickStr[bnd] = 's[' + bnd + ']-2'
-          } else {
-            dPickStr[bnd] = '1'
-          }
-          if(cod === 0) {
-            code.push('if(s[', bnd, ']>1){dst.set(',
-              pickStr.join(), ',', bnd, ',0.5*(src.get(',
-                cPickStr.join(), ')-src.get(',
-                dPickStr.join(), ')))}else{dst.set(',
-              pickStr.join(), ',', bnd, ',0)};')
-          } else {
-            code.push('if(s[', bnd, ']>1){diff(', outStr,
-                ',src.pick(', cPickStr.join(), ')', boundStr,
-                ',src.pick(', dPickStr.join(), ')', boundStr,
-                ');}else{zero(', outStr, ');};')
-          }
-        break
-
-        case 'mirror':
-          if(cod === 0) {
-            code.push('dst.set(', pickStr.join(), ',', bnd, ',0);')
-          } else {
-            code.push('zero(', outStr, ');')
-          }
-        break
-
-        case 'wrap':
-          var aPickStr = pickStr.slice()
-          var bPickStr = pickStr.slice()
-          if(facet[i] < 0) {
-            aPickStr[bnd] = 's[' + bnd + ']-2'
-            bPickStr[bnd] = '0'
-
-          } else {
-            aPickStr[bnd] = 's[' + bnd + ']-1'
-            bPickStr[bnd] = '1'
-          }
-          if(cod === 0) {
-            code.push('if(s[', bnd, ']>2){dst.set(',
-              pickStr.join(), ',', bnd, ',0.5*(src.get(',
-                aPickStr.join(), ')-src.get(',
-                bPickStr.join(), ')))}else{dst.set(',
-              pickStr.join(), ',', bnd, ',0)};')
-          } else {
-            code.push('if(s[', bnd, ']>2){diff(', outStr,
-                ',src.pick(', aPickStr.join(), ')', boundStr,
-                ',src.pick(', bPickStr.join(), ')', boundStr,
-                ');}else{zero(', outStr, ');};')
-          }
-        break
-
-        default:
-          throw new Error('ndarray-gradient: Invalid boundary condition')
-      }
-    }
-
-    if(cod > 0) {
-      code.push('};')
-    }
-  }
-
-  //Enumerate ridges, facets, etc. of hypercube
-  for(var i=0; i<(1<<d); ++i) {
-    var faces = []
-    for(var j=0; j<d; ++j) {
-      if(i & (1<<j)) {
-        faces.push(j+1)
-      }
-    }
-    for(var k=0; k<(1<<faces.length); ++k) {
-      var sfaces = faces.slice()
-      for(var j=0; j<faces.length; ++j) {
-        if(k & (1<<j)) {
-          sfaces[j] = -sfaces[j]
-        }
-      }
-      handleBoundary(sfaces)
-    }
-  }
-
-  code.push('return dst;};return gradient')
-
-  //Compile and link routine, save cached procedure
-  var linkNames = [ 'diff', 'zero' ]
   var linkArgs  = [ centralDiff, zeroOut ]
   for(var i=1; i<=d; ++i) {
-    linkNames.push('grad' + i)
     linkArgs.push(generateTemplate(i))
   }
-  linkNames.push(code.join(''))
 
-  var link = Function.apply(void 0, linkNames)
+  var link = CACHED_link
+
   var proc = link.apply(void 0, linkArgs)
+
   GRADIENT_CACHE[token] = proc
   return proc
 }
