@@ -8,7 +8,6 @@
     "test": "test"
   },
   "dependencies": {
-    "cwise-compiler": "^1.0.0",
     "dup": "^1.0.0"
   },
   "devDependencies": {
