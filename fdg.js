@@ -1,5 +1,7 @@
 'use strict'
 
+var dup = require('dup')
+
 var CACHED_CWiseOp = {
   zero: function(SS, a0, t0, p0) {
       var s0 = SS[0], t0p0 = t0[0]
@@ -42,12 +44,6 @@ var CACHED_CWiseOp = {
     }
   }
 }
-
-function generateCWiseOp(proc) {
-  return CACHED_CWiseOp[proc.funcName]
-}
-
-var compile = generateCWiseOp
 
 var CACHED_thunk = {
   cdiff: function(compile) {
@@ -100,6 +96,10 @@ function createThunk(proc) {
   return thunk(compile.bind(undefined, proc))
 }
 
+function compile(proc) {
+  return CACHED_CWiseOp[proc.funcName]
+}
+
 function Procedure() {
   this.argTypes = []
   this.shimArgs = []
@@ -116,7 +116,7 @@ function Procedure() {
   this.post = null
 }
 
-function compileCwise(user_args) {
+function cwiseCompiler(user_args) {
   //Create procedure
   var proc = new Procedure()
 
@@ -155,11 +155,6 @@ function compileCwise(user_args) {
   return createThunk(proc)
 }
 
-
-module.exports      = gradient
-
-var dup             = require('dup')
-var cwiseCompiler   = compileCwise
 
 var TEMPLATE_CACHE  = {}
 var GRADIENT_CACHE  = {}
@@ -390,7 +385,7 @@ function generateGradient(boundaryConditions) {
   return proc
 }
 
-function gradient(out, inp, bc) {
+module.exports = function gradient(out, inp, bc) {
   if(!Array.isArray(bc)) {
     if(typeof bc === 'string') {
       bc = dup(inp.dimension, bc)
