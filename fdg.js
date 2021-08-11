@@ -73,61 +73,55 @@ function generateCWiseOp(proc) {
 
 var compile = generateCWiseOp
 
-function createThunk(proc) {
-  var code = ["'use strict'", "var CACHED={}"]
-  var vars = []
-  var thunkName = proc.funcName + "_cwise_thunk"
 
-  //Build thunk
-  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
-  var typesig = []
-  var string_typesig = []
-  var proc_args = [["array",proc.arrayArgs[0],".shape.slice(", // Slice shape so that we only retain the shape over which we iterate (which gets passed to the cwise operator as SS).
-                    Math.max(0,proc.arrayBlockIndices[0]),proc.arrayBlockIndices[0]<0?(","+proc.arrayBlockIndices[0]+")"):")"].join("")]
-  var shapeLengthConditions = [], shapeConditions = []
-  // Process array arguments
-  for(var i=0; i<proc.arrayArgs.length; ++i) {
-    var j = proc.arrayArgs[i]
-    vars.push(["t", j, "=array", j, ".dtype,",
-               "r", j, "=array", j, ".order"].join(""))
-    typesig.push("t" + j)
-    typesig.push("r" + j)
-    string_typesig.push("t"+j)
-    string_typesig.push("r"+j+".join()")
-    proc_args.push("array" + j + ".data")
-    proc_args.push("array" + j + ".stride")
-    proc_args.push("array" + j + ".offset|0")
-    if (i>0) { // Gather conditions to check for shape equality (ignoring block indices)
-      shapeLengthConditions.push("array" + proc.arrayArgs[0] + ".shape.length===array" + j + ".shape.length+" + (Math.abs(proc.arrayBlockIndices[0])-Math.abs(proc.arrayBlockIndices[i])))
-      shapeConditions.push("array" + proc.arrayArgs[0] + ".shape[shapeIndex+" + Math.max(0,proc.arrayBlockIndices[0]) + "]===array" + j + ".shape[shapeIndex+" + Math.max(0,proc.arrayBlockIndices[i]) + "]")
+var CACHED_thunk = {
+  cdiff: function(compile) {
+    var CACHED = {}
+    return function cdiff_cwise_thunk(array0, array1, array2) {
+      if (!(array0.shape.length === array1.shape.length + 0 && array0.shape.length === array2.shape.length + 0)) throw new Error('cwise: Arrays do not all have the same dimensionality!')
+      for (var shapeIndex = array0.shape.length - 0; shapeIndex-- > 0;) {
+        if (!(array0.shape[shapeIndex + 0] === array1.shape[shapeIndex + 0] && array0.shape[shapeIndex + 0] === array2.shape[shapeIndex + 0])) throw new Error('cwise: Arrays do not all have the same shape!')
+      }
+      var t0 = array0.dtype, r0 = array0.order, t1 = array1.dtype, r1 = array1.order, t2 = array2.dtype, r2 = array2.order, type = [t0, r0.join(), t1, r1.join(), t2, r2.join()].join(), proc = CACHED[type]
+      if (!proc) { CACHED[type] = proc = compile([t0, r0, t1, r1, t2, r2]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0, array1.data, array1.stride, array1.offset | 0, array2.data, array2.stride, array2.offset | 0)
     }
-  }
-  // Check for shape equality
-  if (proc.arrayArgs.length > 1) {
-    code.push("if (!(" + shapeLengthConditions.join(" && ") + ")) throw new Error('cwise: Arrays do not all have the same dimensionality!')")
-    code.push("for(var shapeIndex=array" + proc.arrayArgs[0] + ".shape.length-" + Math.abs(proc.arrayBlockIndices[0]) + "; shapeIndex-->0;) {")
-    code.push("if (!(" + shapeConditions.join(" && ") + ")) throw new Error('cwise: Arrays do not all have the same shape!')")
-    code.push("}")
-  }
-  // Process scalar arguments
-  for(var i=0; i<proc.scalarArgs.length; ++i) {
-    proc_args.push("scalar" + proc.scalarArgs[i])
-  }
-  // Check for cached function (and if not present, generate it)
-  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
-  vars.push("proc=CACHED[type]")
-  code.push("var " + vars.join(","))
+  },
 
-  code.push(["if(!proc){",
-             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
-             "return proc(", proc_args.join(","), ")}"].join(""))
+  zero: function(compile) {
+    var CACHED = {}
+    return function zero_cwise_thunk(array0) {
+      var t0 = array0.dtype, r0 = array0.order, type = [t0, r0.join()].join(), proc = CACHED[type]
+      if (!proc) { CACHED[type] = proc = compile([t0, r0]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0)
+    }
+  },
 
-  if(proc.debug) {
-    console.log("-----Generated thunk:\n" + code.join("\n") + "\n----------")
-  }
+  fdTemplate1: function(compile) {
+    var CACHED = {}
+    return function fdTemplate1_cwise_thunk(array0, array1) {
+      if (!(array0.shape.length === array1.shape.length + 0)) throw new Error('cwise: Arrays do not all have the same dimensionality!')
+      for (var shapeIndex = array0.shape.length - 0; shapeIndex-- > 0;) {
+        if (!(array0.shape[shapeIndex + 0] === array1.shape[shapeIndex + 0])) throw new Error('cwise: Arrays do not all have the same shape!')
+      }
+      var t0 = array0.dtype, r0 = array0.order, t1 = array1.dtype, r1 = array1.order, type = [t0, r0.join(), t1, r1.join()].join(), proc = CACHED[type]
+      if (!proc) { CACHED[type] = proc = compile([t0, r0, t1, r1]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0, array1.data, array1.stride, array1.offset | 0)
+    }
+  },
 
-  //Compile thunk
-  var thunk = new Function("compile", code.join("\n"))
+  fdTemplate2: function(compile) {
+    var CACHED = {}
+    return function fdTemplate2_cwise_thunk(array0, array1, array4) {
+      if (!(array0.shape.length === array1.shape.length + 0 && array0.shape.length === array4.shape.length + 0)) throw new Error('cwise: Arrays do not all have the same dimensionality!')
+      for (var shapeIndex = array0.shape.length - 0; shapeIndex-- > 0;) {
+        if (!(array0.shape[shapeIndex + 0] === array1.shape[shapeIndex + 0] && array0.shape[shapeIndex + 0] === array4.shape[shapeIndex + 0])) throw new Error('cwise: Arrays do not all have the same shape!')
+      }
+      var t0 = array0.dtype, r0 = array0.order, t1 = array1.dtype, r1 = array1.order, t4 = array4.dtype, r4 = array4.order, type = [t0, r0.join(), t1, r1.join(), t4, r4.join()].join(), proc = CACHED[type]
+      if (!proc) { CACHED[type] = proc = compile([t0, r0, t1, r1, t4, r4]) } return proc(array0.shape.slice(0), array0.data, array0.stride, array0.offset | 0, array1.data, array1.stride, array1.offset | 0, array4.data, array4.stride, array4.offset | 0)
+    }
+  },
+}
+
+function createThunk(proc) {
+  var thunk = CACHED_thunk[proc.funcName]
   return thunk(compile.bind(undefined, proc))
 }
 
