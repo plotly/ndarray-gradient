@@ -88,59 +88,10 @@ function compile(proc) {
   return CACHED_CWiseOp[proc.funcName]
 }
 
-function Procedure() {
-  this.argTypes = []
-  this.shimArgs = []
-  this.arrayArgs = []
-  this.arrayBlockIndices = []
-  this.scalarArgs = []
-  this.offsetArgs = []
-  this.offsetArgIndex = []
-  this.indexArgs = []
-  this.shapeArgs = []
-  this.funcName = ""
-  this.pre = null
-  this.body = null
-  this.post = null
-}
-
 function cwiseCompiler(user_args) {
-  //Create procedure
-  var proc = new Procedure()
-
-  //Parse blocks
-  proc.pre    = user_args.pre
-  proc.body   = user_args.body
-  proc.post   = user_args.post
-
-  //Parse arguments
-  var proc_args = user_args.args.slice(0)
-  proc.argTypes = proc_args
-  for(var i=0; i<proc_args.length; ++i) {
-    var arg_type = proc_args[i]
-    if(arg_type === "array" || (typeof arg_type === "object" && arg_type.blockIndices)) {
-      proc.argTypes[i] = "array"
-      proc.arrayArgs.push(i)
-      proc.arrayBlockIndices.push(arg_type.blockIndices ? arg_type.blockIndices : 0)
-      proc.shimArgs.push("array" + i)
-    } else if(arg_type === "scalar") {
-      proc.scalarArgs.push(i)
-      proc.shimArgs.push("scalar" + i)
-    } else if(arg_type === "index") {
-      proc.indexArgs.push(i)
-    } else if(arg_type === "shape") {
-      proc.shapeArgs.push(i)
-    } else if(typeof arg_type === "object" && arg_type.offset) {
-      proc.argTypes[i] = "offset"
-      proc.offsetArgs.push({ array: arg_type.array, offset:arg_type.offset })
-      proc.offsetArgIndex.push(i)
-    }
-  }
-
-  //Retrieve name
-  proc.funcName = user_args.funcName || "cwise"
-
-  return createThunk(proc)
+  return createThunk({
+    funcName: user_args.funcName
+  })
 }
 
 
@@ -155,48 +106,10 @@ var EmptyProc = {
 }
 
 var centralDiff = cwiseCompiler({
-  args: [ 'array', 'array', 'array' ],
-  pre: EmptyProc,
-  post: EmptyProc,
-  body: {
-    args: [ {
-      name: 'out',
-      lvalue: true,
-      rvalue: false,
-      count: 1
-    }, {
-      name: 'left',
-      lvalue: false,
-      rvalue: true,
-      count: 1
-    }, {
-      name: 'right',
-      lvalue: false,
-      rvalue: true,
-      count: 1
-    }],
-    body: "out=0.5*(left-right)",
-    thisVars: [],
-    localVars: []
-  },
   funcName: 'cdiff'
 })
 
 var zeroOut = cwiseCompiler({
-  args: [ 'array' ],
-  pre: EmptyProc,
-  post: EmptyProc,
-  body: {
-    args: [ {
-      name: 'out',
-      lvalue: true,
-      rvalue: false,
-      count: 1
-    }],
-    body: "out=0",
-    thisVars: [],
-    localVars: []
-  },
   funcName: 'zero'
 })
 
@@ -204,45 +117,7 @@ function generateTemplate(d) {
   if(d in TEMPLATE_CACHE) {
     return TEMPLATE_CACHE[d]
   }
-  var code = []
-  for(var i=0; i<d; ++i) {
-    code.push('out', i, 's=0.5*(inp', i, 'l-inp', i, 'r);')
-  }
-  var args = [ 'array' ]
-  var names = ['junk']
-  for(var i=0; i<d; ++i) {
-    args.push('array')
-    names.push('out' + i + 's')
-    var o = dup(d)
-    o[i] = -1
-    args.push({
-      array: 0,
-      offset: o.slice()
-    })
-    o[i] = 1
-    args.push({
-      array: 0,
-      offset: o.slice()
-    })
-    names.push('inp' + i + 'l', 'inp' + i + 'r')
-  }
   return TEMPLATE_CACHE[d] = cwiseCompiler({
-    args: args,
-    pre:  EmptyProc,
-    post: EmptyProc,
-    body: {
-      body: code.join(''),
-      args: names.map(function(n) {
-        return {
-          name: n,
-          lvalue: n.indexOf('out') === 0,
-          rvalue: n.indexOf('inp') === 0,
-          count: (n!=='junk')|0
-        }
-      }),
-      thisVars: [],
-      localVars: []
-    },
     funcName: 'fdTemplate' + d
   })
 }
