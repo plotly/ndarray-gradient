@@ -1,6 +1,6 @@
 {
   "name": "ndarray-gradient",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Finds the gradient of an ndarray using finite differences",
   "main": "fdg.js",
   "directories": {
